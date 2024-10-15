@@ -16,29 +16,40 @@ transform = transforms.Compose([
 train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
 test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
 
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False)
+# Increase batch size
+train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True, num_workers=4, pin_memory=True)
+test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False, num_workers=4, pin_memory=True)
 
-# Define a simple neural network
+# Define a more complex neural network
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.fc1 = nn.Linear(28 * 28, 128)
-        self.fc2 = nn.Linear(128, 64)
-        self.fc3 = nn.Linear(64, 10)
+        self.conv1 = nn.Conv2d(1, 32, 3, 1)
+        self.conv2 = nn.Conv2d(32, 64, 3, 1)
+        self.dropout1 = nn.Dropout(0.25)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc1 = nn.Linear(9216, 128)
+        self.fc2 = nn.Linear(128, 10)
 
     def forward(self, x):
-        x = x.view(-1, 28 * 28)
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+        x = self.conv1(x)
+        x = nn.functional.relu(x)
+        x = self.conv2(x)
+        x = nn.functional.relu(x)
+        x = nn.functional.max_pool2d(x, 2)
+        x = self.dropout1(x)
+        x = torch.flatten(x, 1)
+        x = self.fc1(x)
+        x = nn.functional.relu(x)
+        x = self.dropout2(x)
+        x = self.fc2(x)
+        return nn.functional.log_softmax(x, dim=1)
 
 # Initialize the model, loss function, and optimizer
 device = torch.device("mps")
 model = Net().to(device)
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+optimizer = optim.Adam(model.parameters(), lr=0.001)  # Changed to Adam optimizer
 
 # Training loop
 def train(epochs):
@@ -47,8 +58,7 @@ def train(epochs):
         model.train()
         running_loss = 0.0
         for inputs, labels in train_loader:
-            inputs = inputs.to(device)
-            labels = labels.to(device)
+            inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = criterion(outputs, labels)
@@ -60,91 +70,46 @@ def train(epochs):
         print(f'Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}')
     return train_losses
 
-# Evaluation function
 def evaluate():
     model.eval()
     correct = 0
     total = 0
     with torch.no_grad():
-        for inputs, labels in test_loader:
-            inputs = inputs.to(device)
-            labels = labels.to(device)
-            outputs = model(inputs)
+        for images, labels in test_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
             _, predicted = torch.max(outputs.data, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
+
     accuracy = 100 * correct / total
-    print(f'Accuracy on the test set: {accuracy:.2f}%')
+    print(f'Test Accuracy: {accuracy:.2f}%')
     return accuracy
 
-# Visualization function
-def visualize(train_losses, accuracy, iteration):
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 12))
-
-    # Plot training loss
-    ax1.plot(train_losses)
-    ax1.set_title('Training Loss')
-    ax1.set_xlabel('Epoch')
-    ax1.set_ylabel('Loss')
-
-    # Plot test accuracy
-    ax2.bar(['Accuracy'], [accuracy])
-    ax2.set_title('Test Accuracy')
-    ax2.set_ylabel('Accuracy (%)')
-    ax2.set_ylim(0, 100)  # Set y-axis limit for percentage
-
-    # Generate interpretation text
-    interpretation = f"""
-Iteration {iteration} Results:
-1. Training Loss: The final training loss is {train_losses[-1]:.4f}.
-   {interpret_loss(train_losses)}
-2. Test Accuracy: The model achieved an accuracy of {accuracy:.2f}% on the test set.
-   {interpret_accuracy(accuracy)}
-"""
-
-    # Add interpretation text to the plot
-    plt.figtext(0.1, 0.01, interpretation, wrap=True, fontsize=9)
-
-    plt.tight_layout()
-    plt.subplots_adjust(bottom=0.3)  # Adjust bottom margin for text
-
-    # Create a directory for saving results if it doesn't exist
-    results_dir = 'results'
-    if not os.path.exists(results_dir):
-        os.makedirs(results_dir)
-
-    # Generate a timestamp for unique filenames
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    # Save the plot
-    plot_filename = f'{results_dir}/plot_iteration_{iteration}_{timestamp}.png'
-    plt.savefig(plot_filename, dpi=300, bbox_inches='tight')
-    plt.close()  # Close the plot to free up memory
-
-    print(f"Results saved for iteration {iteration}")
-    print(interpretation)
-
-def interpret_loss(losses):
-    if losses[-1] < losses[0]:
-        return "The loss decreased over the training period, indicating that the model has learned from the data."
-    else:
-        return "The loss did not decrease, suggesting that the model may need adjustments or more training time."
-
-def interpret_accuracy(acc):
-    if acc > 90:
-        return "This is a good accuracy for the MNIST dataset, suggesting the model has learned well."
-    elif acc > 80:
-        return "This accuracy is reasonable, but there might be room for improvement."
-    else:
-        return "This accuracy is lower than expected for MNIST. The model might need adjustments or more training."
-
 if __name__ == "__main__":
-    num_iterations = 5  # Number of times to train and evaluate the model
+    num_iterations = 5
+    all_train_losses = []
+    all_accuracies = []
+
     for iteration in range(num_iterations):
         print(f"\nStarting iteration {iteration + 1}")
         epochs = 10
-        model = Net().to(device)  # Reinitialize the model for each iteration
-        optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+        model = Net().to(device)
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
+
         train_losses = train(epochs)
         accuracy = evaluate()
-        visualize(train_losses, accuracy, iteration + 1)
+
+        all_train_losses.append(train_losses)
+        all_accuracies.append(accuracy)
+
+        print(f"Iteration {iteration + 1} completed. Final accuracy: {accuracy:.2f}%")
+
+    # Print summary of all iterations
+    print("\nSummary of all iterations:")
+    for i, (losses, acc) in enumerate(zip(all_train_losses, all_accuracies), 1):
+        print(f"Iteration {i}: Final loss: {losses[-1]:.4f}, Accuracy: {acc:.2f}%")
+
+    # Calculate and print average accuracy
+    avg_accuracy = sum(all_accuracies) / len(all_accuracies)
+    print(f"\nAverage accuracy across all iterations: {avg_accuracy:.2f}%")
