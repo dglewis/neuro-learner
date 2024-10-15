@@ -1,0 +1,26 @@
+Trial 1
+Running CPU benchmark...
+CPU Time: 2245.79 seconds
+
+Running MPS (GPU) benchmark...
+MPS Time: 735.11 seconds
+
+Speedup: 3.06x
+
+Trial 2
+Running CPU benchmark...
+CPU Time: 2006.76 seconds
+
+Running MPS (GPU) benchmark...
+MPS Time: 717.65 seconds
+
+Speedup: 2.80x
+
+Trial 3
+Running CPU benchmark...
+CPU Time: 2006.45 seconds
+
+Running MPS (GPU) benchmark...
+MPS Time: 717.68 seconds
+
+Speedup: 2.80x
