@@ -6,6 +6,8 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import os
 from datetime import datetime
+import time
+import subprocess
 
 # Set up MNIST dataset
 transform = transforms.Compose([
@@ -54,7 +56,9 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)  # Changed to Adam optimize
 # Training loop
 def train(epochs):
     train_losses = []
+    total_start_time = time.time()
     for epoch in range(epochs):
+        epoch_start_time = time.time()
         model.train()
         running_loss = 0.0
         for inputs, labels in train_loader:
@@ -67,8 +71,14 @@ def train(epochs):
             running_loss += loss.item()
         avg_loss = running_loss / len(train_loader)
         train_losses.append(avg_loss)
-        print(f'Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}')
-    return train_losses
+        gpu_memory = get_gpu_memory_usage()
+        epoch_duration = time.time() - epoch_start_time
+        print(f'Epoch [{epoch+1}/{epochs}], Loss: {avg_loss:.4f}, '
+              f'GPU Memory: {gpu_memory:.2f} MB, Duration: {epoch_duration:.2f} seconds')
+
+    total_duration = time.time() - total_start_time
+    print(f'Total training time: {total_duration:.2f} seconds')
+    return train_losses, total_duration
 
 def evaluate():
     model.eval()
@@ -86,10 +96,38 @@ def evaluate():
     print(f'Test Accuracy: {accuracy:.2f}%')
     return accuracy
 
+def get_gpu_memory_usage():
+    if torch.backends.mps.is_available():
+        return torch.mps.current_allocated_memory() / 1024**2  # Convert to MB
+    else:
+        return 0  # Return 0 if MPS is not available
+
+def get_gpu_utilization():
+    try:
+        # This command works on macOS to get GPU info
+        result = subprocess.run(['ioreg', '-l', '-w', '0', '-r', '-c', 'AppleM1Processor'], capture_output=True, text=True)
+        output = result.stdout
+
+        # Parse the output to get GPU utilization
+        for line in output.split('\n'):
+            if 'gpu_busy' in line:
+                utilization = float(line.split('=')[1].strip())
+                return utilization * 100  # Convert to percentage
+
+        return "N/A"
+    except Exception as e:
+        print(f"Error getting GPU utilization: {e}")
+        return "N/A"
+
 if __name__ == "__main__":
     num_iterations = 5
     all_train_losses = []
     all_accuracies = []
+    all_durations = []
+
+    print("Initial GPU Information:")
+    print(f"GPU Memory Usage: {get_gpu_memory_usage():.2f} MB")
+    print(f"GPU Utilization: {get_gpu_utilization()}%")
 
     for iteration in range(num_iterations):
         print(f"\nStarting iteration {iteration + 1}")
@@ -97,19 +135,22 @@ if __name__ == "__main__":
         model = Net().to(device)
         optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-        train_losses = train(epochs)
+        train_losses, duration = train(epochs)
         accuracy = evaluate()
 
         all_train_losses.append(train_losses)
         all_accuracies.append(accuracy)
+        all_durations.append(duration)
 
-        print(f"Iteration {iteration + 1} completed. Final accuracy: {accuracy:.2f}%")
+        print(f"Iteration {iteration + 1} completed. Final accuracy: {accuracy:.2f}%, Duration: {duration:.2f} seconds")
 
     # Print summary of all iterations
     print("\nSummary of all iterations:")
-    for i, (losses, acc) in enumerate(zip(all_train_losses, all_accuracies), 1):
-        print(f"Iteration {i}: Final loss: {losses[-1]:.4f}, Accuracy: {acc:.2f}%")
+    for i, (losses, acc, dur) in enumerate(zip(all_train_losses, all_accuracies, all_durations), 1):
+        print(f"Iteration {i}: Final loss: {losses[-1]:.4f}, Accuracy: {acc:.2f}%, Duration: {dur:.2f} seconds")
 
-    # Calculate and print average accuracy
+    # Calculate and print averages
     avg_accuracy = sum(all_accuracies) / len(all_accuracies)
+    avg_duration = sum(all_durations) / len(all_durations)
     print(f"\nAverage accuracy across all iterations: {avg_accuracy:.2f}%")
+    print(f"Average duration across all iterations: {avg_duration:.2f} seconds")
