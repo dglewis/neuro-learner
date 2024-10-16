@@ -18,9 +18,13 @@ transform = transforms.Compose([
 train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
 test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
 
-# Increase batch size
-train_loader = DataLoader(train_dataset, batch_size=512, shuffle=True, num_workers=4, pin_memory=True)
-test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False, num_workers=4, pin_memory=True)
+# Increase batch size (adjust these values as needed)
+train_batch_size = 1024  # Increased from 512
+test_batch_size = 2000   # Increased from 1000
+
+# Update DataLoader with new batch sizes
+train_loader = DataLoader(train_dataset, batch_size=train_batch_size, shuffle=True, num_workers=4, pin_memory=True)
+test_loader = DataLoader(test_dataset, batch_size=test_batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
 # Define a more complex neural network
 class Net(nn.Module):
