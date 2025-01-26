@@ -1,5 +1,5 @@
-torch==2.2.2
-torchvision==0.17.2
+torch==2.5.1
+torchvision==0.20.1
 matplotlib==3.9.2
 psutil==5.9.5
 py-cpuinfo==9.0.0

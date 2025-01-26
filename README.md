@@ -4,7 +4,7 @@
 This project serves as a foundation for learning about Machine Learning and Deep Learning, with a focus on benchmarking GPU vs CPU performance using PyTorch. It utilizes the Metal Performance Shaders (MPS) API to access GPU capabilities on Mac systems.
 
 ## Project Structure
-
+```
 neuro-learner/
 │
 ├── benchmark_gpu_cpu.py  # Script for benchmarking GPU vs CPU performance
@@ -12,7 +12,7 @@ neuro-learner/
 ├── test_gpu.py           # Script for testing GPU availability and PyTorch setup
 ├── requirements.txt      # Python dependencies
 └── README.md             # Project documentation
-
+```
 ## Setup Instructions
 
 ### Prerequisites
@@ -27,10 +27,18 @@ neuro-learner/
    ```
 2. Set up a virtual environment and install dependencies:
    ```sh
-   python3 -m venv venv
-   source venv/bin/activate
+   python3.12 -m venv .venv
+   source .venv/bin/activate
    pip install -r requirements.txt
    ```
+
+### Requirements
+The project requires the following Python packages:
+- `torch==2.5.1`
+- `torchvision==0.20.1`
+- `matplotlib==3.9.2`
+- `psutil==5.9.5`
+- `py-cpuinfo==9.0.0`
 
 ## Usage
 

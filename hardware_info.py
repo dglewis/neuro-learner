@@ -1,16 +1,22 @@
-import platform
+# import platform
 import psutil
 import cpuinfo
-import torch
+# import torch
 import subprocess
 
 def get_cpu_info():
     cpu_info = cpuinfo.get_cpu_info()
+    try:
+        cpu_freq = psutil.cpu_freq()
+        frequency = f"{cpu_freq.current:.2f} MHz" if cpu_freq else "N/A"
+    except Exception as e:
+        frequency = "N/A"  # Handle the error gracefully
+
     return {
         "brand": cpu_info['brand_raw'],
         "cores": psutil.cpu_count(logical=False),
         "threads": psutil.cpu_count(logical=True),
-        "frequency": f"{psutil.cpu_freq().current:.2f} MHz",
+        "frequency": frequency,
         "ram": f"{psutil.virtual_memory().total / (1024**3):.2f} GB"
     }
 
